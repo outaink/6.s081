@@ -1,8 +1,0 @@
-{
-    "files.associations": {
-        "*.pl": "prolog",
-        "sysinfo.h": "c",
-        "defs.h": "c",
-        "user.h": "c"
-    }
-}
