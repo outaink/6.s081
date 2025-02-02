@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="7ecae8db-4641-4329-9346-faba1c5871a0" name="docker-s081">
+        <fileTransfer rootFolder="/workspace/xv6-labs-2020/6.s081" accessType="SFTP" host="localhost" port="2222" sshConfigId="16e4e741-b99c-48c9-a3c0-bd33ed62e7aa" sshConfig="root@localhost:2222 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" keepAliveTimeout="0" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>
