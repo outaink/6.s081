@@ -141,6 +141,20 @@ found:
   return p;
 }
 
+// 递归释放一个内核页表中的所有映射,但是不释放其指向的物理页
+void
+mh_kvm_free_kernel_pagetable(pagetable_t pagetable) {
+  for (int i = 0; i < 512; i++) {
+    pte_t pte = pagetable[i];
+    uint64 child = PTE2PA(pte);
+    if ((pte & PTE_V) && (pte & (PTE_R | PTE_W | PTE_X)) == 0) {
+      mh_kvm_free_kernel_pagetable((pagetable_t)child);
+      pagetable[i] = 0;
+    }
+  }
+  kfree((void*)pagetable);
+}
+
 // free a proc structure and the data hanging from it,
 // including user pages.
 // p->lock must be held.
@@ -150,6 +164,8 @@ freeproc(struct proc *p)
   if(p->trapframe)
     kfree((void*)p->trapframe);
   p->trapframe = 0;
+
+  // 这里是释放用户页表及其物理页
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
   p->pagetable = 0;
@@ -160,6 +176,15 @@ freeproc(struct proc *p)
   p->chan = 0;
   p->killed = 0;
   p->xstate = 0;
+
+  // 释放进程的内核栈
+  void* kstack_pa = (void*)kvmpa(p->proc_kn_pagetable, p->kstack);
+  kfree(kstack_pa);
+  p->kstack = 0;
+
+  // 递归释放进程独立的页表,释放页表本身所占的空间,但不释放物理页
+  mh_kvm_free_kernel_pagetable(p->proc_kn_pagetable);
+  p->proc_kn_pagetable = 0;
   p->state = UNUSED;
 }
 
@@ -488,7 +513,14 @@ scheduler(void)
         //  切换到进程独立的内核页表
         w_satp(MAKE_SATP(p->proc_kn_pagetable));
 
+        // TLB 是硬件缓存，不会自动感知页表变化
+        sfence_vma(); // 清楚快表缓存，刷新TLB缓存，以确保地址转换表更改生效
+
+        // 调度，执行进程
         swtch(&c->context, &p->context);
+
+        // 切换回全局内核页表
+        kvminithart();
 
         // Process is done running for now.
         // It should have changed its p->state before coming back.
