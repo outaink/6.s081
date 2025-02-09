@@ -31,15 +31,15 @@ procinit(void)
   for(p = proc; p < &proc[NPROC]; p++) {
       initlock(&p->lock, "proc");
 
-      // Allocate a page for the process's kernel stack.
-      // Map it high in memory, followed by an invalid
-      // guard page.
-      char *pa = kalloc();
-      if(pa == 0)
-        panic("kalloc");
-      uint64 va = KSTACK((int) (p - proc));
-      kvmmap(va, (uint64)pa, PGSIZE, PTE_R | PTE_W);
-      p->kstack = va;
+      // // Allocate a page for the process's kernel stack.
+      // // Map it high in memory, followed by an invalid
+      // // guard page.
+      // char *pa = kalloc();
+      // if(pa == 0)
+      //   panic("kalloc");
+      // uint64 va = KSTACK((int) (p - proc));
+      // kvmmap(va, (uint64)pa, PGSIZE, PTE_R | PTE_W);
+      // p->kstack = va;
   }
   kvminithart();
 }
@@ -120,6 +120,17 @@ found:
     release(&p->lock);
     return 0;
   }
+
+  // 为新进程创建独立的内核页表
+  p->proc_kn_pagetable = mh_kvminit_new_pagetable();
+
+  // 分配一个物理页，作为新进程的内核栈使用
+  char* pa = kalloc();
+  if (pa == 0)
+    panic("kallo");
+  uint64 va = KSTACK((int)0); //将内核栈映射到固定的逻辑地址上
+  kvmmap(p->proc_kn_pagetable, va, (uint64) pa, PGSIZE, PTE_R | PTE_W);
+  p->kstack = va; // 记录内核栈的虚拟地址
 
   // Set up new context to start executing at forkret,
   // which returns to user space.
@@ -473,6 +484,10 @@ scheduler(void)
         // before jumping back to us.
         p->state = RUNNING;
         c->proc = p;
+
+        //  切换到进程独立的内核页表
+        w_satp(MAKE_SATP(p->proc_kn_pagetable));
+
         swtch(&c->context, &p->context);
 
         // Process is done running for now.
