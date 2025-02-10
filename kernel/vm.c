@@ -61,8 +61,7 @@ mh_kvminit_new_pagetable(void)
 void
 kvminit()
 {
-  kernel_pagetable = (pagetable_t) kalloc();
-  memset(kernel_pagetable, 0, PGSIZE);
+  kernel_pagetable = mh_kvminit_new_pagetable();
 }
 
 // Switch h/w page table register to the kernel's page table,
@@ -391,6 +390,8 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
   }
   return 0;
 }
+
+// 将 src 页表的一部分页映射关系拷贝到 dst 页表中。只拷贝 PTE 不拷贝实际的物理页内存
 
 // Copy from user to kernel.
 // Copy len bytes to dst from virtual address srcva in a given page table.
