@@ -55,14 +55,53 @@ mh_kvminit_new_pagetable(void)
   return pagetable;
 }
 
+void 
+mh_kvm_map_pagetable(pagetable_t pagetable)
+{
+  // 将内核需要的各种 direct mapping 添加到pagetable中
+
+  // uart 寄存器（某一种很重要的硬件设备）
+  kvmmap(pagetable, UART0, UART0, PGSIZE, PTE_R | PTE_W);
+
+  // virto mmio disk interface 磁盘设备接口
+  kvmmap(pagetable, VIRTIO0, VIRTIO0, PGSIZE, PTE_R | PTE_W);
+
+  // CLINT 核心中断处理
+  kvmmap(pagetable, CLINT, CLINT, 0x10000, PTE_R | PTE_W);
+
+  // PLIC 外部中断处理
+  kvmmap(pagetable, PLIC, PLIC, 0x400000, PTE_R | PTE_W);
+
+  // map kernel text executable and read-only
+  kvmmap(pagetable, KERNBASE, KERNBASE, (uint64)etext - KERNBASE, PTE_R | PTE_X);
+
+  // map kernel data and the physical RAM we'll make use of.
+  kvmmap(pagetable, (uint64)etext, (uint64)etext, PHYSTOP - (uint64)etext, PTE_R | PTE_W);
+
+  // map the trampoline for trap entry/exit to
+  // the highest virtual address in the kernel
+  kvmmap(pagetable, TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R | PTE_X);
+
+}
+
+pagetable_t
+mh_kvminit_new_pagetable(void) 
+{
+  pagetable_t pagetable = (pagetable_t) kalloc();
+  memset(pagetable, 0, PGSIZE);
+
+  mh_kvm_map_pagetable(pagetable);
+
+  return pagetable;
+}
+
 /*
  * create a direct-map page table for the kernel.
  */
 void
 kvminit()
 {
-  kernel_pagetable = (pagetable_t) kalloc();
-  memset(kernel_pagetable, 0, PGSIZE);
+  kernel_pagetable = mh_kvminit_new_pagetable();
 }
 
 // Switch h/w page table register to the kernel's page table,
@@ -391,6 +430,8 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
   }
   return 0;
 }
+
+// 将 src 页表的一部分页映射关系拷贝到 dst 页表中。只拷贝 PTE 不拷贝实际的物理页内存
 
 // Copy from user to kernel.
 // Copy len bytes to dst from virtual address srcva in a given page table.
