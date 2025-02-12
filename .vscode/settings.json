@@ -1,6 +1,9 @@
 {
     "files.associations": {
         "*.pl": "prolog",
-        "riscv.h": "c"
+        "riscv.h": "c",
+        "memlayout.h": "c",
+        "fs.h": "c",
+        "defs.h": "c"
     }
 }

@@ -184,7 +184,9 @@ int             copyin(pagetable_t, char *, uint64, uint64);
 int             copyinstr(pagetable_t, char *, uint64, uint64);
 int             mh_vmprint(pagetable_t);
 pagetable_t     mh_kvminit_new_pagetable(void);
+uint64          mh_kvm_dealloc(pagetable_t , uint64 , uint64);
 void            mh_kvm_map_pagetable(pagetable_t);
+int             mh_kvm_copy_mappings(pagetable_t, pagetable_t, uint64, uint64);
 
 // plic.c
 void            plicinit(void);
