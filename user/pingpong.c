@@ -3,37 +3,34 @@
 #include "user/user.h"
 
 int main(int argc, char **argv) {
-    // 创建两个管道：pp2c == pipe parent to child
-    int pp2c[2], pc2p[2];
-    pipe(pp2c);
-    pipe(pc2p);
+    int pipe_p2c[2], pipe_c2p[2];
 
-    if (fork() != 0) { // 父进程
-        // 父进程向子进程发送一个字符
-        write(pp2c[1], ".", 1);
-        close(pp2c[1]);
+    // 创建管道，在数组中写入管道读端和写端的文件描述符，[0]是读取端，[1]是写入端
+    pipe(pipe_p2c);
+    pipe(pipe_c2p);
 
-        //父进程从子进程读取一个字符
+    char ball = '.';
+
+
+    if (fork() != 0) {
+        write(pipe_p2c[1], &ball, 1);
+        close(pipe_p2c[1]);
+
         char buf;
-        read(pc2p[0], &buf, 1);
+        read(pipe_c2p[0], &buf, 1);
         printf("%d: received pong\n", getpid());
-        
-        // 等待子进程结束
         wait(0);
-    } else {   // 子进程
-        // 子进程从父进程读取一个字符
+    } else {
         char buf;
-        read(pp2c[0], &buf, 1);
+        read(pipe_p2c[0], &buf, 1);
         printf("%d: received ping\n", getpid());
 
-        // 子进程向父进程发送一个字符
-        write(pc2p[1], &buf, 1);
-        close(pc2p[1]);
+        write(pipe_c2p[1], &buf, 1);
+        close(pipe_c2p[1]);
     }
 
-    // 关闭管道的读端
-    close(pp2c[0]);
-    close(pc2p[0]);
+    close(pipe_c2p[0]);
+    close(pipe_p2c[0]);
 
     exit(0);
 }

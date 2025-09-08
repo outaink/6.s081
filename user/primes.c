@@ -2,63 +2,68 @@
 #include "kernel/stat.h"
 #include "user/user.h"
 
-void sieve(int pleft[2]) {
-    // 从左邻居读取整数
-    int p;
-    read(pleft[0], &p, sizeof(p));
-    if (p == -1) {
+#define END_MARKER -1
+#define MAX_NUMBER 35
+
+void sieve_process(int read_fd) {
+    int prime;
+    int bytes_read = read(read_fd, &prime, sizeof(prime));
+    
+    if (bytes_read == 0 || prime == END_MARKER) {
+        close(read_fd);
         exit(0);
     }
-    printf("prime %d\n", p);  // 此时收到的肯定是质数
 
-    // 创建一个新的管道
-    int pright[2];
-    pipe(pright);
+    printf("prime %d\n", prime);
+
+    int next_pipe[2];
+    pipe(next_pipe);
 
     if (fork() == 0) {
-        close(pright[1]);
-        close(pleft[0]);
-        sieve(pright); 
+        close(read_fd);
+        close(next_pipe[1]);
+        sieve_process(next_pipe[0]);
     } else {
-        close(pright[0]);
+        close(next_pipe[0]);
 
-        // 从左邻居接收数字
-        int buf;
-        while(read(pleft[0], &buf, sizeof(buf)) && buf != -1) {
-            if (buf % p != 0) {
-                write(pright[1], &buf, sizeof(buf));
+        int number;
+        while (read(read_fd, &number, sizeof(number)) > 0) {
+            if (number == END_MARKER) {
+                write(next_pipe[1], &number, sizeof(number));
+                break;
+            }
+            if (number % prime != 0) {
+                write(next_pipe[1], &number, sizeof(number));
             }
         }
 
-        // 如果左邻居给来 -1 也要告诉右邻居 -1
-        buf = -1;
-        write(pright[1], &buf, sizeof(buf));
+        close(read_fd);
+        close(next_pipe[1]);
         wait(0);
         exit(0);
     }
 }
 
 int main(int argc, char **argv) {
-    // 创建初始管道
-    int input_pipe[2];
-    pipe(input_pipe);
+    int numbers_pipe[2];
+    pipe(numbers_pipe);
 
-    if (fork() == 0) { // 右邻居
-        close(input_pipe[1]);  // 右邻居不需要写端，关掉
-        sieve(input_pipe);  // 调用筛选函数
-        exit(0);
-    } else {            // 父进程
-        close(input_pipe[0]); // 父进程只需要用到写端，关掉自己的读端
-        int i;
-        for (i = 2; i <= 35; i++) {
-            write(input_pipe[1], &i, sizeof(i)); // 向管道中写入2～35的整数
+    if (fork() == 0) {
+        close(numbers_pipe[1]);
+        sieve_process(numbers_pipe[0]);
+    } else {
+        close(numbers_pipe[0]);
+        
+        for (int i = 2; i <= MAX_NUMBER; i++) {
+            write(numbers_pipe[1], &i, sizeof(i));
         }
-        // 写入结束标志
-        i = -1;
-        write(input_pipe[1], &i, sizeof(i));
+        
+        int end_marker = END_MARKER;
+        write(numbers_pipe[1], &end_marker, sizeof(end_marker));
+        close(numbers_pipe[1]);
+        
+        wait(0);
     }
 
-    wait(0);
-    // 这里等待子进程的子进程结束，只能等待直接子进程，无法等待间接子进程
     exit(0);
 }
