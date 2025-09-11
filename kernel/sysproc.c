@@ -97,34 +97,57 @@ sys_uptime(void)
   return xticks;
 }
 
-// 当前进程的系统调用跟踪掩码
+// 系统调用: trace(int mask)
+// 功能: 设置当前进程的系统调用跟踪掩码
+// 参数: mask - 位掩码，每一位对应一个系统调用号，为1表示需要跟踪该系统调用
+// 返回值: 成功返回0，失败返回-1
 uint64
 sys_trace(void)
 {
-  int mask;
+  int trace_mask;
+  struct proc *current_proc = myproc();
 
-  if (argint(0, &mask) < 0)
+  // 从用户空间获取第一个参数（掩码值）
+  // argint(0, ...) 表示获取第0个参数（索引从0开始）
+  if (argint(0, &trace_mask) < 0) {
+    // 参数获取失败，返回错误
     return -1;
+  }
 
-  myproc()->mh_syscall_trace = mask;
-  return 0;
+  // 设置当前进程的系统调用跟踪掩码
+  // 该掩码会被子进程继承
+  current_proc->syscall_trace_mask = trace_mask;
+  
+  return 0;  // 成功设置跟踪掩码
 }
 
-// 收集系统信息
+// 系统调用: sysinfo(struct sysinfo *info)
+// 功能: 收集当前系统状态信息并返回给用户空间
+// 参数: info - 用户空间的 sysinfo 结构体指针，用于存储系统信息
+// 返回值: 成功返回0，失败返回-1
 uint64
 sys_sysinfo(void) {
-  struct sysinfo info;
-  mh_freebytes(&info.freemem);  // 获取空闲内存
-  mh_procnum(&info.nproc);      // 获取进程数量
+  struct sysinfo kernel_info;
+  struct proc *current_proc = myproc();
+  
+  // 收集系统信息
+  mh_freebytes(&kernel_info.freemem);   // 统计空闲内存大小
+  mh_procnum(&kernel_info.nproc);       // 统计活动进程数量
 
-  // 获取系统调用的第0个参数，存储到用户空间指针
-  uint64 dstaddr;
-  argaddr(0, &dstaddr);
-
-  // 从内核空间拷贝数据到用户空间
-  if (copyout(myproc()->pagetable, dstaddr, (char*)&info, sizeof info) < 0)
+  // 从用户空间获取第一个参数（info 结构体的地址）
+  uint64 user_info_addr;
+  if (argaddr(0, &user_info_addr) < 0) {
+    // 参数获取失败
     return -1;
+  }
 
-  return 0;
+  // 将内核空间的系统信息拷贝到用户空间
+  // copyout: 从内核地址空间复制数据到用户地址空间
+  if (copyout(current_proc->pagetable, user_info_addr, 
+              (char*)&kernel_info, sizeof(kernel_info)) < 0) {
+    // 数据拷贝失败（可能是地址无效或无权访问）
+    return -1;
+  }
 
+  return 0;  // 成功返回系统信息
 }

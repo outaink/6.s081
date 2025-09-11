@@ -173,8 +173,10 @@ syscall(void)
     // 调用对应的处理函数，并将返回值存储在 a0 寄存器中
     p->trapframe->a0 = syscalls[num]();
 
-    // 如果当前进程启用了 trace 跟踪，则按照题设要求打印信息
-    if ((p->mh_syscall_trace >> num) & 1) {
+    // 检查是否需要跟踪此系统调用
+    // 通过位运算检查 trace 掩码的第 num 位是否为 1
+    if ((p->syscall_trace_mask >> num) & 1) {
+      // 打印跟踪信息: PID: syscall 名称 -> 返回值
       printf("%d: syscall %s -> %d\n", p->pid, mh_syscall_names[num], p->trapframe->a0);
     }
   } else {

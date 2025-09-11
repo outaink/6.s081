@@ -81,16 +81,22 @@ kalloc(void)
   return (void*)r;
 }
 
-// 获取空闲内存
-// dst == destination address
+// 函数: mh_freebytes
+// 功能: 计算系统中总的空闲内存大小（字节数）
+// 参数: dst - 指向用于存储空闲内存大小的变量
+// 实现: 遍历空闲内存链表，累加每个空闲页的大小
 void mh_freebytes(uint64* dst) {
   *dst = 0;
-  struct run* p = kmem.freelist;
+  struct run* free_page = kmem.freelist;
 
-  acquire(&kmem.lock);  // 加锁保证线程安全
-  while (p) {
-    *dst += PGSIZE; 
-    p = p->next;
+  // 获取内存管理锁，保证多核环境下的线程安全
+  acquire(&kmem.lock);
+  
+  // 遍历空闲页链表，累加每个页的大小
+  while (free_page) {
+    *dst += PGSIZE;  // PGSIZE 是每个页的大小（4096字节）
+    free_page = free_page->next;
   }
-  release(&kmem.lock);
+  
+  release(&kmem.lock);  // 释放锁
 }

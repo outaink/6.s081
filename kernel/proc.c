@@ -127,7 +127,7 @@ found:
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
 
-  p->mh_syscall_trace = 0;  // 创建新进程的时候，mh_syscall_trace 设置为默认值0
+  p->syscall_trace_mask = 0;  // 跟踪系统调用掩码 设置为默认值0
   return p;
 }
 
@@ -298,7 +298,7 @@ fork(void)
 
   release(&np->lock);
 
-  np->mh_syscall_trace = p->mh_syscall_trace; // 子进程继承父进程的syscall_trace
+  np->syscall_trace_mask = p->syscall_trace_mask; // 子进程继承父进程的syscall_trace
 
   return pid;
 }
@@ -698,13 +698,21 @@ procdump(void)
 }
 
 
-// 统计处于活动状态的进程
+// 函数: mh_procnum
+// 功能: 统计系统中所有活动进程的数量
+// 参数: dst - 指向用于存储进程数量的变量
+// 实现: 遍历进程表，累计所有非 UNUSED 状态的进程
 void 
 mh_procnum(uint64* dst) {
   *dst = 0;
-  struct proc* p;
-  for (p = proc; p < &proc[NPROC]; p++) {
-    if (p->state != UNUSED) {
+  struct proc* current_proc;
+  
+  // 遍历整个进程表
+  // proc 是进程表的起始地址，NPROC 是最大进程数
+  for (current_proc = proc; current_proc < &proc[NPROC]; current_proc++) {
+    // 统计所有非 UNUSED 状态的进程
+    // UNUSED 表示进程槽未被使用
+    if (current_proc->state != UNUSED) {
       (*dst)++;
     }
   }
