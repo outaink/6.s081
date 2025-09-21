@@ -113,6 +113,18 @@ found:
     return 0;
   }
 
+  // Allocate trapframe for saving context during alarm handling
+  if ((p->alarm_saved_state = (struct trapframe *)kalloc()) == 0) {
+    release(&p->lock);
+    return 0;
+  }
+
+  // Initialize alarm fields
+  p->alarm_interval = 0;         // No alarm by default
+  p->alarm_handler = 0;          // No handler
+  p->alarm_ticks_remaining = 0;  // No ticks remaining
+  p->alarm_in_progress = 0;      // Not in alarm handler
+
   // An empty user page table.
   p->pagetable = proc_pagetable(p);
   if(p->pagetable == 0){
@@ -141,6 +153,12 @@ freeproc(struct proc *p)
   p->trapframe = 0;
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
+
+  // Free alarm saved state trapframe
+  if (p->alarm_saved_state) {
+    kfree((void*)p->alarm_saved_state);
+  }
+
   p->pagetable = 0;
   p->sz = 0;
   p->pid = 0;
@@ -149,6 +167,12 @@ freeproc(struct proc *p)
   p->chan = 0;
   p->killed = 0;
   p->xstate = 0;
+  // Reset alarm fields
+  p->alarm_interval = 0;
+  p->alarm_handler = 0;
+  p->alarm_ticks_remaining = 0;
+  p->alarm_in_progress = 0;
+  p->alarm_saved_state = 0;
   p->state = UNUSED;
 }
 

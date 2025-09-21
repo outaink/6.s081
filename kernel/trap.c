@@ -76,9 +76,29 @@ usertrap(void)
   if(p->killed)
     exit(-1);
 
-  // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2)
+  // Handle timer interrupt
+  if(which_dev == 2) {
+    // Check if periodic alarm should fire
+    if (p->alarm_interval > 0 && !p->alarm_in_progress) {
+      p->alarm_ticks_remaining--;
+
+      if (p->alarm_ticks_remaining <= 0) {
+        // Reset counter for next alarm
+        p->alarm_ticks_remaining = p->alarm_interval;
+
+        // Save current user context before calling handler
+        *p->alarm_saved_state = *p->trapframe;
+
+        // Redirect execution to alarm handler
+        p->trapframe->epc = (uint64)p->alarm_handler;
+
+        // Mark that alarm handler is running
+        p->alarm_in_progress = 1;
+      }
+    }
     yield();
+  }
+    
 
   usertrapret();
 }
@@ -218,3 +238,33 @@ devintr()
   }
 }
 
+// Register a periodic alarm that calls handler every 'ticks' timer interrupts
+// Returns 0 on success
+int sigalarm(int ticks, void(*handler)()) {
+  struct proc* p = myproc();
+
+  // Set up alarm parameters
+  p->alarm_interval = ticks;          // Period between alarms
+  p->alarm_handler = handler;          // Handler function to call
+  p->alarm_ticks_remaining = ticks;    // Initialize countdown
+
+  // Note: alarm_in_progress is already 0 for new alarms
+  // alarm_saved_state is allocated during proc allocation
+
+  return 0;
+}
+
+// Return from alarm handler to resume normal execution
+// Restores the saved user context from before the alarm
+// Returns 0 on success
+int sigreturn() {
+  struct proc* p = myproc();
+
+  // Restore the saved user context
+  *p->trapframe = *p->alarm_saved_state;
+gi
+  // Mark that alarm handler has completed
+  p->alarm_in_progress = 0;
+
+  return 0;
+}
